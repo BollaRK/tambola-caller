@@ -1,197 +1,107 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/game_state.dart';
 import '../services/game_service.dart';
-import '../services/tts_service.dart';
-import '../widgets/number_grid.dart';
-import '../widgets/cast_dialog.dart';
 import '../theme/app_theme.dart';
 
 class GameScreen extends StatefulWidget {
-  final bool resumed;
-  final bool isManual;
-  final int intervalSeconds;
-  final VoidCallback onExit;
-  final bool darkMode;
-  final bool soundOn;
-  final VoidCallback onToggleDark;
-  final VoidCallback onToggleSound;
-  final String themeId;
-  final void Function(String) onThemeChanged;
-
   const GameScreen({
     super.key,
     required this.resumed,
-    required this.isManual,
-    required this.intervalSeconds,
     required this.onExit,
     required this.darkMode,
-    required this.soundOn,
     required this.onToggleDark,
-    required this.onToggleSound,
     required this.themeId,
     required this.onThemeChanged,
   });
+
+  final bool resumed;
+  final VoidCallback onExit;
+  final bool darkMode;
+  final VoidCallback onToggleDark;
+  final String themeId;
+  final void Function(String) onThemeChanged;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
-  final GameService _game = GameService();
-  final TtsService _tts = TtsService();
-  GameState? _state;
-  Timer? _autoTimer;
-  Timer? _resumeAfterDelayTimer;
-  int _countdown = 0;
-  late AnimationController _pulseController;
-
-  static const _resumeDelay = Duration(seconds: 3);
-
-  /// Pause auto-calling temporarily (so user can change theme/cast/dark/sound without missing numbers).
-  void _pauseTemporarily() {
-    if (_state == null || _state!.isManual || _state!.isPaused || _state!.isGameOver) return;
-    _resumeAfterDelayTimer?.cancel();
-    _resumeAfterDelayTimer = null;
-    _autoTimer?.cancel();
-    _game.setPaused(true);
-    setState(() => _state = _game.state);
-  }
-
-  /// Schedule auto-calling to resume after a short delay (e.g. after dialog closes).
-  void _scheduleResumeAfterDelay() {
-    _resumeAfterDelayTimer?.cancel();
-    if (_state == null || _state!.isManual || _state!.isGameOver) return;
-    if (mounted && !_state!.isManual) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Auto-calling will resume in 3 seconds'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-    _resumeAfterDelayTimer = Timer(_resumeDelay, () {
-      if (!mounted) return;
-      _resumeAfterDelayTimer = null;
-      if (_state == null || _state!.isManual || !_state!.isPaused || _state!.isGameOver) return;
-      _game.setPaused(false);
-      setState(() => _state = _game.state);
-      _startAutoTimer();
-    });
-  }
+class _GameScreenState extends State<GameScreen> {
+  final GameService _service = GameService();
+  final TextEditingController _playerController = TextEditingController();
+  TournamentState? _state;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-    if (widget.resumed) {
-      _state = _game.state;
-      if (_state != null && !_state!.isManual && !_state!.isPaused) {
-        _startAutoTimer();
-      }
-    } else {
-      _state = _game.newGame(
-        isManual: widget.isManual,
-        intervalSeconds: widget.intervalSeconds,
-      );
-      if (!_state!.isManual) _startAutoTimer();
-    }
-  }
-
-  void _startAutoTimer() {
-    _autoTimer?.cancel();
-    _countdown = _state!.intervalSeconds;
-    _runCountdownThenCall();
-  }
-
-  void _runCountdownThenCall() {
-    if (_state == null || _state!.isGameOver || _state!.isPaused) return;
-    _autoTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() {
-        _countdown--;
-        if (_countdown <= 0) {
-          _autoTimer?.cancel();
-          _callNext();
-          if (_state != null && !_state!.isGameOver && !_state!.isPaused) {
-            _countdown = _state!.intervalSeconds;
-            _runCountdownThenCall();
-          }
-        }
-      });
-    });
-  }
-
-  void _callNext() {
-    final next = _game.callNext();
-    if (next != null) {
-      _tts.speak(next);
-      setState(() => _state = _game.state);
-    }
-  }
-
-  void _pauseResume() {
-    if (_state == null || _state!.isManual) return;
-    _autoTimer?.cancel();
-    final newPaused = !_state!.isPaused;
-    _game.setPaused(newPaused);
-    setState(() => _state = _game.state);
-    if (!newPaused) {
-      _countdown = _state!.intervalSeconds;
-      _runCountdownThenCall();
-    }
+    _loadTournament();
   }
 
   @override
   void dispose() {
-    _autoTimer?.cancel();
-    _resumeAfterDelayTimer?.cancel();
-    _pulseController.dispose();
+    _playerController.dispose();
     super.dispose();
   }
 
-  void _switchToManual() {
-    _autoTimer?.cancel();
-    _game.setMode(true);
-    setState(() => _state = _game.state);
+  Future<void> _loadTournament() async {
+    final loaded = widget.resumed
+        ? await _service.loadGame()
+        : await _service.newTournament();
+    final state = loaded ?? await _service.newTournament();
+    if (!mounted) return;
+    setState(() {
+      _state = state;
+      _loading = false;
+    });
   }
 
-  void _switchToAuto([int? intervalSeconds]) {
-    final sec = intervalSeconds ?? _state!.intervalSeconds;
-    _game.setMode(false, sec);
-    setState(() => _state = _game.state);
-    _startAutoTimer();
+  Future<void> _refresh(Future<void> Function() action) async {
+    try {
+      await action();
+      if (!mounted) return;
+      setState(() => _state = _service.state);
+    } on Object catch (error) {
+      if (!mounted) return;
+      _showMessage(_friendlyError(error));
+    }
   }
 
-  void _changeInterval(int sec) {
-    _game.setInterval(sec);
-    setState(() => _state = _game.state);
-    if (!_state!.isManual) _startAutoTimer();
+  String _friendlyError(Object error) {
+    if (error is ArgumentError) {
+      return error.message?.toString() ?? 'Please check your input.';
+    }
+    if (error is StateError) {
+      return error.message;
+    }
+    return 'Something went wrong. Please try again.';
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<bool> _onWillPop() async {
-    final theme = Theme.of(context);
     final quit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: Icon(Icons.exit_to_app, color: theme.colorScheme.primary, size: 40),
-        title: const Text('Exit game?'),
+        icon: Icon(Icons.save,
+            color: Theme.of(ctx).colorScheme.primary, size: 40),
+        title: const Text('Exit tournament?'),
         content: const Text(
-          'Your progress is saved. You can resume later.',
-        ),
+            'Your tournament is saved on this device and can be resumed later.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: const Text('Stay'),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.of(ctx).pop(true),
-            icon: const Icon(Icons.check, size: 20),
+            icon: const Icon(Icons.home),
             label: const Text('Exit'),
           ),
         ],
@@ -199,18 +109,16 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     );
     if (quit == true) {
       widget.onExit();
-      return false;
     }
     return false;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_state == null) {
+    final theme = Theme.of(context);
+    if (_loading || _state == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final theme = Theme.of(context);
-    final calledSet = _state!.calledNumbers.toSet();
 
     return PopScope(
       canPop: false,
@@ -220,317 +128,61 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Tambola Caller', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          title: Text(
+            'Pickleball League',
+            style: theme.textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () async => await _onWillPop(),
+            onPressed: () async => _onWillPop(),
             tooltip: 'Back',
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.history_rounded, color: theme.colorScheme.primary),
-              onPressed: _showNumberHistoryModal,
-              tooltip: 'Number History',
-            ),
-            IconButton(
-              icon: Icon(Icons.palette_outlined, color: theme.colorScheme.primary),
-              onPressed: () {
-                _pauseTemporarily();
-                showThemePickerDialog(
-                  context,
-                  currentThemeId: widget.themeId,
-                  isDark: widget.darkMode,
-                  onThemeSelected: widget.onThemeChanged,
-                ).then((_) => _scheduleResumeAfterDelay());
-              },
+              icon: Icon(Icons.palette_outlined,
+                  color: theme.colorScheme.primary),
+              onPressed: () => showThemePickerDialog(
+                context,
+                currentThemeId: widget.themeId,
+                isDark: widget.darkMode,
+                onThemeSelected: widget.onThemeChanged,
+              ),
               tooltip: 'Theme',
             ),
             IconButton(
-              icon: Icon(Icons.cast_connected, color: theme.colorScheme.primary),
-              onPressed: () {
-                _pauseTemporarily();
-                showCastDialog(context).then((_) => _scheduleResumeAfterDelay());
-              },
-              tooltip: 'Cast to TV',
-            ),
-            IconButton(
               icon: Icon(widget.darkMode ? Icons.dark_mode : Icons.light_mode),
-              onPressed: () {
-                _pauseTemporarily();
-                widget.onToggleDark();
-                _scheduleResumeAfterDelay();
-              },
-              tooltip: 'Dark / Light mode',
-            ),
-            IconButton(
-              icon: Icon(widget.soundOn ? Icons.volume_up : Icons.volume_off),
-              onPressed: () {
-                _pauseTemporarily();
-                widget.onToggleSound();
-                _scheduleResumeAfterDelay();
-              },
-              tooltip: 'Sound on / off',
+              onPressed: widget.onToggleDark,
+              tooltip: widget.darkMode ? 'Light mode' : 'Dark mode',
             ),
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
               onSelected: (value) {
-                if (value == 'speed') _showSpeedDialog();
+                if (value == 'reset') _confirmResetTournament();
               },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'speed', child: Text('Voice speed')),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'reset',
+                  child: Text('Reset tournament'),
+                ),
               ],
             ),
           ],
         ),
         body: SafeArea(
-          child: _state!.isGameOver
-              ? _buildGameOver(theme)
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [_buildModeAndSpeedRow(theme)],
-                      ),
-                      const SizedBox(height: 10),
-                      // Current number - compact
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              theme.colorScheme.primary,
-                              theme.colorScheme.primary.withOpacity(0.85),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: theme.colorScheme.primary.withOpacity(0.35),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          _state!.currentNumber != null ? '${_state!.currentNumber}' : '—',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.displayMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 40,
-                            color: theme.colorScheme.onPrimary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Last 5: ', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                          const SizedBox(width: 6),
-                          ..._state!.lastFive.map((n) => Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primaryContainer,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: theme.colorScheme.primary.withOpacity(0.5)),
-                                  ),
-                                  child: Text('$n', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                                ),
-                              )),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (_state!.isManual)
-                        _buildCallNextButton(theme)
-                      else
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: _pauseResume,
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: theme.colorScheme.primary, width: 2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(_state!.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 22, color: theme.colorScheme.primary),
-                                  const SizedBox(width: 8),
-                                  Text(_state!.isPaused ? 'Resume' : 'Pause', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 14),
-                      Text('1 – 90', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
-                      const SizedBox(height: 6),
-                      NumberGrid(
-                        calledNumbers: calledSet,
-                        isDark: theme.brightness == Brightness.dark,
-                      ),
-                    ],
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-
-  void _showNumberHistoryModal() {
-    _pauseTemporarily();
-    final theme = Theme.of(context);
-    // Show most recent first (reversed order)
-    final list = _state!.calledNumbers.reversed.toList();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360, maxHeight: 480),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.history_rounded, color: theme.colorScheme.primary, size: 24),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Number History', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                          Text('Most recent first', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Flexible(
-                child: list.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text('No numbers called yet', style: theme.textTheme.bodyMedium),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: list.length,
-                        itemBuilder: (context, i) {
-                          final n = list[i];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 24,
-                                  child: Text('${i + 1}.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                                ),
-                                const SizedBox(width: 8),
-                                Text('$n', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Close'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ).then((_) => _scheduleResumeAfterDelay());
-  }
-
-  Widget _buildModeAndSpeedRow(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Auto: Switch (toggle like the reference)
-          Text('Auto ', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
-          Switch(
-            value: !_state!.isManual,
-            onChanged: (on) => on ? _switchToAuto() : _switchToManual(),
-            activeThumbColor: theme.colorScheme.onPrimary,
-            activeTrackColor: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          // Speed: radio when Auto is on
-          if (!_state!.isManual) ...[
-            Text('Speed ', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
-            ...([3, 5, 7].map((sec) => SizedBox(
-                  height: 32,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Radio<int>(
-                        value: sec,
-                        groupValue: _state!.intervalSeconds,
-                        onChanged: (_) => _changeInterval(sec),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      Text('$sec', style: theme.textTheme.bodySmall),
-                    ],
-                  ),
-                ))),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCallNextButton(ThemeData theme) {
-    return SizedBox(
-      width: double.infinity,
-      child: Material(
-        color: theme.colorScheme.primary,
-        borderRadius: BorderRadius.circular(10),
-        elevation: 2,
-        shadowColor: theme.colorScheme.primary.withOpacity(0.35),
-        child: InkWell(
-          onTap: _callNext,
-          borderRadius: BorderRadius.circular(10),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.skip_next_rounded, size: 20, color: theme.colorScheme.onPrimary),
-                const SizedBox(width: 8),
-                Text('Call Next Number', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
+                _buildProgressHeader(theme),
+                const SizedBox(height: 16),
+                if (_state!.phase == TournamentPhase.setup) _buildSetup(theme),
+                if (_state!.phase == TournamentPhase.league)
+                  _buildLeague(theme),
+                if (_state!.phase == TournamentPhase.knockout)
+                  _buildKnockout(theme),
+                if (_state!.phase == TournamentPhase.complete)
+                  _buildChampion(theme),
               ],
             ),
           ),
@@ -539,37 +191,45 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildGameOver(ThemeData theme) {
-    return Center(
+  Widget _buildProgressHeader(ThemeData theme) {
+    const phases = [
+      TournamentPhase.setup,
+      TournamentPhase.league,
+      TournamentPhase.knockout,
+      TournamentPhase.complete,
+    ];
+
+    return Card(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(14),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.celebration, size: 64, color: theme.colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(
-              'Game Over!',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'All 90 numbers have been called.',
-              style: theme.textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 28),
-            FilledButton.icon(
-              onPressed: () => widget.onExit(),
-              icon: const Icon(Icons.home, size: 22),
-              label: const Text('Back to Home'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
+            Text('Tournament progress',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: phases.map((phase) {
+                final selected = phase == _state!.phase;
+                return Chip(
+                  avatar: Icon(
+                    _phaseIcon(phase),
+                    size: 18,
+                    color: selected
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.primary,
+                  ),
+                  label: Text(phaseLabel(phase)),
+                  backgroundColor:
+                      selected ? theme.colorScheme.primaryContainer : null,
+                  labelStyle: TextStyle(
+                      fontWeight:
+                          selected ? FontWeight.bold : FontWeight.normal),
+                );
+              }).toList(),
             ),
           ],
         ),
@@ -577,40 +237,724 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _showSpeedDialog() {
-    double speed = _tts.speechRate;
-    showDialog<void>(
+  IconData _phaseIcon(TournamentPhase phase) {
+    switch (phase) {
+      case TournamentPhase.setup:
+        return Icons.groups;
+      case TournamentPhase.league:
+        return Icons.table_chart;
+      case TournamentPhase.knockout:
+        return Icons.account_tree;
+      case TournamentPhase.complete:
+        return Icons.emoji_events;
+    }
+  }
+
+  Widget _buildSetup(ThemeData theme) {
+    final unassigned = _state!.unassignedPlayers;
+    final canStart = _state!.teams.length >= 2 && unassigned.isEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSectionCard(
+          theme,
+          title: '1. Enter players',
+          icon: Icons.person_add_alt,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _playerController,
+                      textInputAction: TextInputAction.done,
+                      decoration: const InputDecoration(
+                        labelText: 'Player name',
+                        hintText: 'Example: Anna',
+                      ),
+                      onSubmitted: (_) => _addPlayer(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: _addPlayer,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (_state!.players.isEmpty)
+                const Text(
+                    'Add at least four players to create two doubles teams.')
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _state!.players.map((player) {
+                    final assigned =
+                        _state!.assignedPlayerIds.contains(player.id);
+                    return InputChip(
+                      avatar: Icon(
+                          assigned ? Icons.check_circle : Icons.person_outline,
+                          size: 18),
+                      label: Text(player.name),
+                      onDeleted: assigned
+                          ? null
+                          : () =>
+                              _refresh(() => _service.removePlayer(player.id)),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildSectionCard(
+          theme,
+          title: '2. Select partners',
+          icon: Icons.handshake,
+          trailing: FilledButton.icon(
+            onPressed: unassigned.length >= 2
+                ? () => _showTeamDialog(unassigned)
+                : null,
+            icon: const Icon(Icons.group_add),
+            label: const Text('Create Team'),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_state!.teams.isEmpty)
+                const Text(
+                    'No teams yet. Select two unassigned players to form each doubles team.')
+              else
+                ..._state!.teams.map((team) => _buildTeamTile(theme, team)),
+              if (unassigned.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Unassigned: ${unassigned.map((player) => player.name).join(', ')}',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          color: canStart
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerHighest,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ready to create the league?',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  canStart
+                      ? '${_state!.teams.length} teams will play a round-robin league.'
+                      : 'Create at least two teams and assign every player to a partner.',
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed:
+                      canStart ? () => _refresh(_service.startLeague) : null,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Start League Stage'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeamTile(ThemeData theme, Team team) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: theme.colorScheme.secondaryContainer,
+          foregroundColor: theme.colorScheme.onSecondaryContainer,
+          child: const Icon(Icons.groups),
+        ),
+        title: Text(team.name(_state!.players),
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: const Text('Doubles team'),
+        trailing: IconButton(
+          icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+          onPressed: () => _refresh(() => _service.removeTeam(team.id)),
+          tooltip: 'Remove team',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addPlayer() async {
+    final name = _playerController.text;
+    await _refresh(() async {
+      await _service.addPlayer(name);
+      _playerController.clear();
+    });
+  }
+
+  Future<void> _showTeamDialog(List<Player> unassignedPlayers) async {
+    var firstId = unassignedPlayers.first.id;
+    var secondId = unassignedPlayers.length > 1
+        ? unassignedPlayers[1].id
+        : unassignedPlayers.first.id;
+
+    await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) {
+        builder: (ctx, setDialogState) {
+          final secondOptions = unassignedPlayers
+              .where((player) => player.id != firstId)
+              .toList();
+          if (!secondOptions.any((player) => player.id == secondId)) {
+            secondId = secondOptions.first.id;
+          }
+
           return AlertDialog(
-            title: const Text('Voice speed'),
+            icon: Icon(Icons.handshake,
+                color: Theme.of(ctx).colorScheme.primary, size: 40),
+            title: const Text('Create team'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Slider(
-                  value: speed,
-                  min: 0,
-                  max: 1,
-                  divisions: 5,
-                  label: speed < 0.3 ? 'Slower' : (speed > 0.7 ? 'Faster' : 'Normal'),
-                  onChanged: (v) {
-                    setDlg(() => speed = v);
-                    _tts.speechRate = v;
+                DropdownButtonFormField<String>(
+                  initialValue: firstId,
+                  decoration: const InputDecoration(labelText: 'Player 1'),
+                  items: unassignedPlayers
+                      .map((player) => DropdownMenuItem(
+                          value: player.id, child: Text(player.name)))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setDialogState(() => firstId = value);
                   },
                 ),
-                Text(speed < 0.3 ? 'Slower' : (speed > 0.7 ? 'Faster' : 'Normal')),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: secondId,
+                  decoration: const InputDecoration(labelText: 'Player 2'),
+                  items: secondOptions
+                      .map((player) => DropdownMenuItem(
+                          value: player.id, child: Text(player.name)))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setDialogState(() => secondId = value);
+                  },
+                ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Done'),
+                child: const Text('Cancel'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  Navigator.of(ctx).pop();
+                  await _refresh(() => _service.addTeam(firstId, secondId));
+                },
+                icon: const Icon(Icons.check),
+                label: const Text('Create'),
               ),
             ],
           );
         },
       ),
     );
+  }
+
+  Widget _buildLeague(ThemeData theme) {
+    final standings = _state!.standings();
+    final qualifierCount = _state!.qualifierCount;
+    final qualifierStage = stageLabel(_state!.firstKnockoutStage).toLowerCase();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildInfoBanner(
+          theme,
+          icon: Icons.info_outline,
+          title: 'League stage',
+          message:
+              'Enter scores for every match. Top $qualifierCount teams advance to the $qualifierStage.',
+        ),
+        const SizedBox(height: 16),
+        _buildStandings(theme, standings, qualifierCount),
+        const SizedBox(height: 16),
+        _buildSectionCard(
+          theme,
+          title: 'League matches',
+          icon: Icons.sports_score,
+          child: Column(
+            children: _state!.leagueMatches
+                .map((match) => _buildMatchTile(theme, match,
+                    onScore: () => _showScoreDialog(match, isLeague: true)))
+                .toList(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _state!.isLeagueComplete
+              ? () => _refresh(_service.startKnockout)
+              : null,
+          icon: const Icon(Icons.account_tree),
+          label: Text('Create ${stageLabel(_state!.firstKnockoutStage)}'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStandings(
+      ThemeData theme, List<TeamStanding> standings, int qualifierCount) {
+    return _buildSectionCard(
+      theme,
+      title: 'Standings',
+      icon: Icons.leaderboard,
+      child: Column(
+        children: [
+          for (var index = 0; index < standings.length; index += 1)
+            _buildStandingRow(
+                theme, standings[index], index + 1, index < qualifierCount),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStandingRow(
+      ThemeData theme, TeamStanding standing, int rank, bool qualifies) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: qualifies
+            ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.65)
+            : theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: qualifies
+              ? theme.colorScheme.secondary
+              : theme.colorScheme.outline.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: qualifies
+                ? theme.colorScheme.secondary
+                : theme.colorScheme.surfaceContainerHighest,
+            foregroundColor: qualifies
+                ? theme.colorScheme.onSecondary
+                : theme.colorScheme.onSurface,
+            child: Text('$rank'),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              standing.team.name(_state!.players),
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          _statColumn('P', standing.played),
+          _statColumn('W', standing.wins),
+          _statColumn('L', standing.losses),
+          _statColumn('+/-', standing.pointDifference),
+          _statColumn('Pts', standing.leaguePoints),
+        ],
+      ),
+    );
+  }
+
+  Widget _statColumn(String label, int value) {
+    return SizedBox(
+      width: 42,
+      child: Column(
+        children: [
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text('$value', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKnockout(ThemeData theme) {
+    final activeStage = _state!.activeKnockoutStage;
+    final matchesByStage = <MatchStage, List<TournamentMatch>>{};
+    for (final match in _state!.knockoutMatches) {
+      matchesByStage.putIfAbsent(match.stage, () => []).add(match);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildInfoBanner(
+          theme,
+          icon: Icons.account_tree,
+          title: activeStage == null
+              ? 'Advancing bracket'
+              : stageLabel(activeStage),
+          message: activeStage == null
+              ? 'Winners are being prepared for the next round.'
+              : 'Enter scores for ${stageLabel(activeStage).toLowerCase()} matches to advance winners.',
+        ),
+        const SizedBox(height: 16),
+        _buildStandings(theme, _state!.standings(), _state!.qualifierCount),
+        const SizedBox(height: 16),
+        ...[
+          MatchStage.quarterfinal,
+          MatchStage.semifinal,
+          MatchStage.finalMatch,
+        ].where(matchesByStage.containsKey).map((stage) {
+          final matches = matchesByStage[stage]!
+            ..sort((a, b) => a.order.compareTo(b.order));
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildSectionCard(
+              theme,
+              title: stageLabel(stage),
+              icon: stage == MatchStage.finalMatch
+                  ? Icons.emoji_events
+                  : Icons.sports_tennis,
+              child: Column(
+                children: matches.map((match) {
+                  final canScore = stage == activeStage || !match.isCompleted;
+                  return _buildMatchTile(
+                    theme,
+                    match,
+                    onScore: canScore
+                        ? () => _showScoreDialog(match, isLeague: false)
+                        : null,
+                  );
+                }).toList(),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildChampion(ThemeData theme) {
+    final champion = _state!.championTeamId == null
+        ? null
+        : _state!.teamName(_state!.championTeamId!);
+    final finalMatches = _state!.knockoutMatches
+        .where((match) => match.stage == MatchStage.finalMatch)
+        .toList();
+    final finalMatch = finalMatches.isEmpty ? null : finalMatches.last;
+
+    return Center(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(Icons.emoji_events,
+                  size: 80, color: theme.colorScheme.primary),
+              const SizedBox(height: 16),
+              Text(
+                'Tournament Champion',
+                style: theme.textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                champion ?? 'Champion not available',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (finalMatch != null && finalMatch.hasScore) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Final score: ${finalMatch.scoreA} - ${finalMatch.scoreB}',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ],
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: _confirmResetTournament,
+                icon: const Icon(Icons.restart_alt),
+                label: const Text('Start Another Tournament'),
+              ),
+              TextButton.icon(
+                onPressed: widget.onExit,
+                icon: const Icon(Icons.home),
+                label: const Text('Back to Home'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMatchTile(
+    ThemeData theme,
+    TournamentMatch match, {
+    required VoidCallback? onScore,
+  }) {
+    final teamA = _state!.teamName(match.teamAId);
+    final teamB = _state!.teamName(match.teamBId);
+    final winner = match.winnerId;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '${stageLabel(match.stage)} Match ${match.order}',
+              style: theme.textTheme.labelLarge
+                  ?.copyWith(color: theme.colorScheme.primary),
+            ),
+            const SizedBox(height: 10),
+            _teamScoreLine(theme, teamA, match.scoreA, winner == match.teamAId),
+            const SizedBox(height: 6),
+            _teamScoreLine(theme, teamB, match.scoreB, winner == match.teamBId),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: match.isCompleted
+                  ? OutlinedButton.icon(
+                      onPressed: onScore,
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Edit Score'),
+                    )
+                  : FilledButton.icon(
+                      onPressed: onScore,
+                      icon: const Icon(Icons.scoreboard),
+                      label: const Text('Enter Score'),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _teamScoreLine(
+      ThemeData theme, String teamName, int? score, bool winner) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: winner
+            ? theme.colorScheme.primaryContainer
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          if (winner) ...[
+            Icon(Icons.check_circle,
+                color: theme.colorScheme.primary, size: 18),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(teamName,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          Text(score?.toString() ?? '-',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showScoreDialog(TournamentMatch match,
+      {required bool isLeague}) async {
+    final teamAController =
+        TextEditingController(text: match.scoreA?.toString() ?? '');
+    final teamBController =
+        TextEditingController(text: match.scoreB?.toString() ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Score ${stageLabel(match.stage)} Match ${match.order}'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _scoreField(teamAController, _state!.teamName(match.teamAId)),
+              const SizedBox(height: 12),
+              _scoreField(teamBController, _state!.teamName(match.teamBId)),
+              const SizedBox(height: 10),
+              const Text(
+                  'Scores cannot be tied because a winner must advance.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              if (formKey.currentState?.validate() != true) return;
+              final scoreA = int.parse(teamAController.text.trim());
+              final scoreB = int.parse(teamBController.text.trim());
+              Navigator.of(ctx).pop();
+              await _refresh(() async {
+                if (isLeague) {
+                  await _service.saveLeagueScore(match.id, scoreA, scoreB);
+                } else {
+                  await _service.saveKnockoutScore(match.id, scoreA, scoreB);
+                }
+              });
+            },
+            icon: const Icon(Icons.save),
+            label: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    teamAController.dispose();
+    teamBController.dispose();
+  }
+
+  Widget _scoreField(TextEditingController controller, String label) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label),
+      validator: (value) {
+        final score = int.tryParse((value ?? '').trim());
+        if (score == null) return 'Enter a number';
+        if (score < 0) return 'Score cannot be negative';
+        return null;
+      },
+    );
+  }
+
+  Widget _buildSectionCard(
+    ThemeData theme, {
+    required String title,
+    required IconData icon,
+    required Widget child,
+    Widget? trailing,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: theme.colorScheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (trailing != null) trailing,
+              ],
+            ),
+            const SizedBox(height: 14),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoBanner(
+    ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String message,
+  }) {
+    return Card(
+      color: theme.colorScheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(icon, color: theme.colorScheme.onPrimaryContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(message,
+                      style: TextStyle(
+                          color: theme.colorScheme.onPrimaryContainer)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmResetTournament() async {
+    final reset = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.warning_amber,
+            color: Theme.of(ctx).colorScheme.error, size: 42),
+        title: const Text('Reset tournament?'),
+        content: const Text(
+            'This clears the current players, teams, scores, and bracket.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+
+    if (reset == true) {
+      await _refresh(() async {
+        await _service.newTournament();
+      });
+    }
   }
 }

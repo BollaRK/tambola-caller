@@ -8,10 +8,10 @@ const String themePurple = 'purple';
 const String themeTeal = 'teal';
 
 // --- Themes with distinct designs (color + shape/elevation) ---
-const String themeOrangeRounded = 'orange_rounded';  // Softer, very rounded
-const String themeBlueFlat = 'blue_flat';            // Flat, minimal shadows
-const String themeGreenElevated = 'green_elevated';  // Strong depth, shadows
-const String themeMinimal = 'minimal';               // Neutral, clean
+const String themeOrangeRounded = 'orange_rounded'; // Softer, very rounded
+const String themeBlueFlat = 'blue_flat'; // Flat, minimal shadows
+const String themeGreenElevated = 'green_elevated'; // Strong depth, shadows
+const String themeMinimal = 'minimal'; // Neutral, clean
 
 const List<String> themeIds = [
   themeOrange,
@@ -160,7 +160,9 @@ Future<void> showThemePickerDialog(
                 radius: 18,
               ),
               title: Text(themeDisplayName(id)),
-              trailing: selected ? Icon(Icons.check, color: theme.colorScheme.primary) : null,
+              trailing: selected
+                  ? Icon(Icons.check, color: theme.colorScheme.primary)
+                  : null,
               onTap: () {
                 onThemeSelected(id);
                 Navigator.of(ctx).pop();
@@ -206,7 +208,9 @@ ThemeData getTheme(String themeId, bool isDark) {
       break;
   }
 
-  final scheme = ColorScheme.fromSeed(seedColor: seedColor, brightness: isDark ? Brightness.dark : Brightness.light);
+  final scheme = ColorScheme.fromSeed(
+      seedColor: seedColor,
+      brightness: isDark ? Brightness.dark : Brightness.light);
   final d = _designFor(themeId);
 
   return ThemeData(
@@ -215,33 +219,39 @@ ThemeData getTheme(String themeId, bool isDark) {
     cardTheme: CardThemeData(
       elevation: d.cardElevation + (isDark ? 2 : 0),
       shadowColor: isDark ? Colors.black45 : Colors.black26,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.cardRadius)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(d.cardRadius)),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         elevation: d.buttonElevation,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.buttonRadius)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(d.buttonRadius)),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         elevation: d.buttonElevation,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.buttonRadius)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(d.buttonRadius)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.buttonRadius)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(d.buttonRadius)),
       ),
     ),
     dialogTheme: DialogThemeData(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(d.cardRadius)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(d.cardRadius)),
     ),
     inputDecorationTheme: InputDecorationTheme(
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(d.buttonRadius)),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(d.buttonRadius)),
       filled: true,
     ),
   );

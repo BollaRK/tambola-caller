@@ -6,7 +6,8 @@ Future<void> showCastDialog(BuildContext context) {
   return showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      icon: Icon(Icons.cast_connected, size: 48, color: Theme.of(ctx).colorScheme.primary),
+      icon: Icon(Icons.cast_connected,
+          size: 48, color: Theme.of(ctx).colorScheme.primary),
       title: const Text('Cast to TV'),
       content: const SingleChildScrollView(
         child: Column(
@@ -20,7 +21,8 @@ Future<void> showCastDialog(BuildContext context) {
             SizedBox(height: 12),
             Text('• Android: Swipe down → tap Cast or Screen cast'),
             SizedBox(height: 4),
-            Text('• iPhone / iPad: Swipe down → tap Screen Mirroring → choose your TV'),
+            Text(
+                '• iPhone / iPad: Swipe down → tap Screen Mirroring → choose your TV'),
             SizedBox(height: 4),
             Text('• Windows: Settings → System → Projecting to this PC'),
             SizedBox(height: 16),

@@ -1,107 +1,86 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'services/tts_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/game_screen.dart';
 import 'theme/app_theme.dart';
 
-class TambolaApp extends StatefulWidget {
+class PickleballApp extends StatefulWidget {
   final bool initialDark;
-  final bool initialSound;
   final String initialThemeId;
 
-  const TambolaApp({
+  const PickleballApp({
     super.key,
     this.initialDark = false,
-    this.initialSound = true,
-    this.initialThemeId = themeOrange,
+    this.initialThemeId = themeGreen,
   });
 
   @override
-  State<TambolaApp> createState() => _TambolaAppState();
+  State<PickleballApp> createState() => _PickleballAppState();
 }
 
-class _TambolaAppState extends State<TambolaApp> {
+class _PickleballAppState extends State<PickleballApp> {
   late bool _darkMode;
-  late bool _soundOn;
   late String _themeId;
-  bool _showGame = false;
-  bool _resumedGame = false;
-  bool _gameManual = true;
-  int _gameIntervalSeconds = 5;
+  bool _showTournament = false;
+  bool _resumedTournament = false;
 
   @override
   void initState() {
     super.initState();
     _darkMode = widget.initialDark;
-    _soundOn = widget.initialSound;
     _themeId = widget.initialThemeId;
   }
 
   void _setTheme(String themeId) {
     setState(() => _themeId = themeId);
-    SharedPreferences.getInstance().then((p) => p.setString('tambola_theme', themeId));
+    SharedPreferences.getInstance()
+        .then((p) => p.setString('pickleball_theme', themeId));
   }
 
   void _toggleDarkMode() {
     setState(() {
       _darkMode = !_darkMode;
-      SharedPreferences.getInstance().then((p) => p.setBool('tambola_dark_mode', _darkMode));
+      SharedPreferences.getInstance()
+          .then((p) => p.setBool('pickleball_dark_mode', _darkMode));
     });
   }
 
-  void _toggleSound() {
+  void _openTournament({bool resume = false}) {
     setState(() {
-      _soundOn = !_soundOn;
-      TtsService().enabled = _soundOn;
-      SharedPreferences.getInstance().then((p) => p.setBool('tambola_sound', _soundOn));
+      _showTournament = true;
+      _resumedTournament = resume;
     });
   }
 
-  void _openGame({bool resume = false, bool? isManual, int? intervalSeconds}) {
+  void _closeTournament() {
     setState(() {
-      _showGame = true;
-      _resumedGame = resume;
-      if (isManual != null) _gameManual = isManual;
-      if (intervalSeconds != null) _gameIntervalSeconds = intervalSeconds;
-    });
-  }
-
-  void _closeGame() {
-    setState(() {
-      _showGame = false;
-      _resumedGame = false;
+      _showTournament = false;
+      _resumedTournament = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Tambola Caller',
+      title: 'Pickleball League',
       debugShowCheckedModeBanner: false,
       themeMode: _darkMode ? ThemeMode.dark : ThemeMode.light,
       theme: getTheme(_themeId, false),
       darkTheme: getTheme(_themeId, true),
-      home: _showGame
+      home: _showTournament
           ? GameScreen(
-              resumed: _resumedGame,
-              isManual: _gameManual,
-              intervalSeconds: _gameIntervalSeconds,
-              onExit: _closeGame,
+              resumed: _resumedTournament,
+              onExit: _closeTournament,
               darkMode: _darkMode,
-              soundOn: _soundOn,
               onToggleDark: _toggleDarkMode,
-              onToggleSound: _toggleSound,
               themeId: _themeId,
               onThemeChanged: _setTheme,
             )
           : HomeScreen(
-              onNewGame: _openGame,
-              onResume: () => _openGame(resume: true),
+              onNewTournament: () => _openTournament(),
+              onResume: () => _openTournament(resume: true),
               darkMode: _darkMode,
-              soundOn: _soundOn,
               onToggleDark: _toggleDarkMode,
-              onToggleSound: _toggleSound,
               themeId: _themeId,
               onThemeChanged: _setTheme,
             ),
