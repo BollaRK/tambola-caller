@@ -10,7 +10,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('home screen shows pickleball tournament actions', (tester) async {
+  testWidgets('home screen shows pickleball tournament actions',
+      (tester) async {
     await tester.pumpWidget(const PickleballApp());
     await tester.pumpAndSettle();
 
@@ -38,25 +39,35 @@ void main() {
     expect(service.state!.firstKnockoutStage, MatchStage.semifinal);
 
     for (final match in service.state!.leagueMatches) {
-      final teamAIndex = service.state!.teams.indexWhere((team) => team.id == match.teamAId);
-      final teamBIndex = service.state!.teams.indexWhere((team) => team.id == match.teamBId);
+      final teamAIndex =
+          service.state!.teams.indexWhere((team) => team.id == match.teamAId);
+      final teamBIndex =
+          service.state!.teams.indexWhere((team) => team.id == match.teamBId);
       final teamAWins = teamAIndex < teamBIndex;
-      await service.saveLeagueScore(match.id, teamAWins ? 11 : 6, teamAWins ? 6 : 11);
+      await service.saveLeagueScore(
+          match.id, teamAWins ? 11 : 6, teamAWins ? 6 : 11);
     }
 
     await service.startKnockout();
     expect(service.state!.phase, TournamentPhase.knockout);
     expect(service.state!.knockoutMatches.length, 2);
-    expect(service.state!.knockoutMatches.every((match) => match.stage == MatchStage.semifinal), isTrue);
+    expect(
+        service.state!.knockoutMatches
+            .every((match) => match.stage == MatchStage.semifinal),
+        isTrue);
 
     final semis = service.state!.knockoutMatches.toList();
     for (final match in semis) {
       await service.saveKnockoutScore(match.id, 11, 7);
     }
     expect(service.state!.phase, TournamentPhase.knockout);
-    expect(service.state!.knockoutMatches.where((match) => match.stage == MatchStage.finalMatch), hasLength(1));
+    expect(
+        service.state!.knockoutMatches
+            .where((match) => match.stage == MatchStage.finalMatch),
+        hasLength(1));
 
-    final finalMatch = service.state!.knockoutMatches.singleWhere((match) => match.stage == MatchStage.finalMatch);
+    final finalMatch = service.state!.knockoutMatches
+        .singleWhere((match) => match.stage == MatchStage.finalMatch);
     await service.saveKnockoutScore(finalMatch.id, 11, 9);
 
     expect(service.state!.phase, TournamentPhase.complete);

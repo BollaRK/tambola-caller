@@ -59,8 +59,11 @@ class GameService {
   Future<void> removePlayer(String playerId) async {
     final current = _requireSetupState();
     _state = current.copyWith(
-      players: current.players.where((player) => player.id != playerId).toList(),
-      teams: current.teams.where((team) => !team.containsPlayer(playerId)).toList(),
+      players:
+          current.players.where((player) => player.id != playerId).toList(),
+      teams: current.teams
+          .where((team) => !team.containsPlayer(playerId))
+          .toList(),
     );
     await _persist();
   }
@@ -103,7 +106,8 @@ class GameService {
       throw StateError('Create at least two teams.');
     }
     if (current.unassignedPlayers.isNotEmpty) {
-      throw StateError('Assign partners for every player before starting the league.');
+      throw StateError(
+          'Assign partners for every player before starting the league.');
     }
 
     final matches = <TournamentMatch>[];
@@ -157,7 +161,8 @@ class GameService {
       throw StateError('Enter every league score first.');
     }
 
-    final qualifiers = current.standings()
+    final qualifiers = current
+        .standings()
         .take(current.qualifierCount)
         .map((standing) => standing.team)
         .toList();
@@ -185,9 +190,13 @@ class GameService {
     var nextState = current.copyWith(knockoutMatches: updatedMatches);
 
     final activeStage = nextState.activeKnockoutStage;
-    final scoredMatch = updatedMatches.firstWhere((match) => match.id == matchId);
-    final stageMatches = updatedMatches.where((match) => match.stage == scoredMatch.stage).toList();
-    final stageComplete = stageMatches.isNotEmpty && stageMatches.every((match) => match.isCompleted);
+    final scoredMatch =
+        updatedMatches.firstWhere((match) => match.id == matchId);
+    final stageMatches = updatedMatches
+        .where((match) => match.stage == scoredMatch.stage)
+        .toList();
+    final stageComplete = stageMatches.isNotEmpty &&
+        stageMatches.every((match) => match.isCompleted);
 
     if (stageComplete && activeStage == null) {
       if (scoredMatch.stage == MatchStage.finalMatch) {
@@ -220,7 +229,8 @@ class GameService {
     await prefs.remove(_keyTournamentState);
   }
 
-  bool get hasSavedGame => _state != null && _state!.phase != TournamentPhase.complete;
+  bool get hasSavedGame =>
+      _state != null && _state!.phase != TournamentPhase.complete;
 
   TournamentState _requireSetupState() {
     final current = _state;
@@ -247,11 +257,13 @@ class GameService {
       throw ArgumentError('Scores cannot be negative.');
     }
     if (scoreA == scoreB) {
-      throw ArgumentError('Pickleball matches need a winner. Scores cannot be tied.');
+      throw ArgumentError(
+          'Pickleball matches need a winner. Scores cannot be tied.');
     }
   }
 
-  List<TournamentMatch> _buildSeededMatches(List<Team> seededTeams, MatchStage stage) {
+  List<TournamentMatch> _buildSeededMatches(
+      List<Team> seededTeams, MatchStage stage) {
     final matches = <TournamentMatch>[];
     var order = 1;
     for (var i = 0; i < seededTeams.length ~/ 2; i += 1) {

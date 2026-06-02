@@ -44,7 +44,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Future<void> _loadTournament() async {
-    final loaded = widget.resumed ? await _service.loadGame() : await _service.newTournament();
+    final loaded = widget.resumed
+        ? await _service.loadGame()
+        : await _service.newTournament();
     final state = loaded ?? await _service.newTournament();
     if (!mounted) return;
     setState(() {
@@ -87,9 +89,11 @@ class _GameScreenState extends State<GameScreen> {
     final quit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.save, color: Theme.of(ctx).colorScheme.primary, size: 40),
+        icon: Icon(Icons.save,
+            color: Theme.of(ctx).colorScheme.primary, size: 40),
         title: const Text('Exit tournament?'),
-        content: const Text('Your tournament is saved on this device and can be resumed later.'),
+        content: const Text(
+            'Your tournament is saved on this device and can be resumed later.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -126,7 +130,8 @@ class _GameScreenState extends State<GameScreen> {
         appBar: AppBar(
           title: Text(
             'Pickleball League',
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
@@ -135,7 +140,8 @@ class _GameScreenState extends State<GameScreen> {
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.palette_outlined, color: theme.colorScheme.primary),
+              icon: Icon(Icons.palette_outlined,
+                  color: theme.colorScheme.primary),
               onPressed: () => showThemePickerDialog(
                 context,
                 currentThemeId: widget.themeId,
@@ -171,9 +177,12 @@ class _GameScreenState extends State<GameScreen> {
                 _buildProgressHeader(theme),
                 const SizedBox(height: 16),
                 if (_state!.phase == TournamentPhase.setup) _buildSetup(theme),
-                if (_state!.phase == TournamentPhase.league) _buildLeague(theme),
-                if (_state!.phase == TournamentPhase.knockout) _buildKnockout(theme),
-                if (_state!.phase == TournamentPhase.complete) _buildChampion(theme),
+                if (_state!.phase == TournamentPhase.league)
+                  _buildLeague(theme),
+                if (_state!.phase == TournamentPhase.knockout)
+                  _buildKnockout(theme),
+                if (_state!.phase == TournamentPhase.complete)
+                  _buildChampion(theme),
               ],
             ),
           ),
@@ -196,7 +205,9 @@ class _GameScreenState extends State<GameScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Tournament progress', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Tournament progress',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -207,11 +218,16 @@ class _GameScreenState extends State<GameScreen> {
                   avatar: Icon(
                     _phaseIcon(phase),
                     size: 18,
-                    color: selected ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.primary,
+                    color: selected
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.primary,
                   ),
                   label: Text(phaseLabel(phase)),
-                  backgroundColor: selected ? theme.colorScheme.primaryContainer : null,
-                  labelStyle: TextStyle(fontWeight: selected ? FontWeight.bold : FontWeight.normal),
+                  backgroundColor:
+                      selected ? theme.colorScheme.primaryContainer : null,
+                  labelStyle: TextStyle(
+                      fontWeight:
+                          selected ? FontWeight.bold : FontWeight.normal),
                 );
               }).toList(),
             ),
@@ -271,17 +287,24 @@ class _GameScreenState extends State<GameScreen> {
               ),
               const SizedBox(height: 14),
               if (_state!.players.isEmpty)
-                const Text('Add at least four players to create two doubles teams.')
+                const Text(
+                    'Add at least four players to create two doubles teams.')
               else
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: _state!.players.map((player) {
-                    final assigned = _state!.assignedPlayerIds.contains(player.id);
+                    final assigned =
+                        _state!.assignedPlayerIds.contains(player.id);
                     return InputChip(
-                      avatar: Icon(assigned ? Icons.check_circle : Icons.person_outline, size: 18),
+                      avatar: Icon(
+                          assigned ? Icons.check_circle : Icons.person_outline,
+                          size: 18),
                       label: Text(player.name),
-                      onDeleted: assigned ? null : () => _refresh(() => _service.removePlayer(player.id)),
+                      onDeleted: assigned
+                          ? null
+                          : () =>
+                              _refresh(() => _service.removePlayer(player.id)),
                     );
                   }).toList(),
                 ),
@@ -294,7 +317,9 @@ class _GameScreenState extends State<GameScreen> {
           title: '2. Select partners',
           icon: Icons.handshake,
           trailing: FilledButton.icon(
-            onPressed: unassigned.length >= 2 ? () => _showTeamDialog(unassigned) : null,
+            onPressed: unassigned.length >= 2
+                ? () => _showTeamDialog(unassigned)
+                : null,
             icon: const Icon(Icons.group_add),
             label: const Text('Create Team'),
           ),
@@ -302,14 +327,16 @@ class _GameScreenState extends State<GameScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_state!.teams.isEmpty)
-                const Text('No teams yet. Select two unassigned players to form each doubles team.')
+                const Text(
+                    'No teams yet. Select two unassigned players to form each doubles team.')
               else
                 ..._state!.teams.map((team) => _buildTeamTile(theme, team)),
               if (unassigned.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
                   'Unassigned: ${unassigned.map((player) => player.name).join(', ')}',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.error),
                 ),
               ],
             ],
@@ -317,7 +344,9 @@ class _GameScreenState extends State<GameScreen> {
         ),
         const SizedBox(height: 16),
         Card(
-          color: canStart ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceContainerHighest,
+          color: canStart
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerHighest,
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(
@@ -325,7 +354,8 @@ class _GameScreenState extends State<GameScreen> {
               children: [
                 Text(
                   'Ready to create the league?',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -335,7 +365,8 @@ class _GameScreenState extends State<GameScreen> {
                 ),
                 const SizedBox(height: 14),
                 FilledButton.icon(
-                  onPressed: canStart ? () => _refresh(_service.startLeague) : null,
+                  onPressed:
+                      canStart ? () => _refresh(_service.startLeague) : null,
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Start League Stage'),
                 ),
@@ -356,7 +387,8 @@ class _GameScreenState extends State<GameScreen> {
           foregroundColor: theme.colorScheme.onSecondaryContainer,
           child: const Icon(Icons.groups),
         ),
-        title: Text(team.name(_state!.players), style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(team.name(_state!.players),
+            style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: const Text('Doubles team'),
         trailing: IconButton(
           icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
@@ -377,28 +409,34 @@ class _GameScreenState extends State<GameScreen> {
 
   Future<void> _showTeamDialog(List<Player> unassignedPlayers) async {
     var firstId = unassignedPlayers.first.id;
-    var secondId = unassignedPlayers.length > 1 ? unassignedPlayers[1].id : unassignedPlayers.first.id;
+    var secondId = unassignedPlayers.length > 1
+        ? unassignedPlayers[1].id
+        : unassignedPlayers.first.id;
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final secondOptions = unassignedPlayers.where((player) => player.id != firstId).toList();
+          final secondOptions = unassignedPlayers
+              .where((player) => player.id != firstId)
+              .toList();
           if (!secondOptions.any((player) => player.id == secondId)) {
             secondId = secondOptions.first.id;
           }
 
           return AlertDialog(
-            icon: Icon(Icons.handshake, color: Theme.of(ctx).colorScheme.primary, size: 40),
+            icon: Icon(Icons.handshake,
+                color: Theme.of(ctx).colorScheme.primary, size: 40),
             title: const Text('Create team'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: firstId,
+                  initialValue: firstId,
                   decoration: const InputDecoration(labelText: 'Player 1'),
                   items: unassignedPlayers
-                      .map((player) => DropdownMenuItem(value: player.id, child: Text(player.name)))
+                      .map((player) => DropdownMenuItem(
+                          value: player.id, child: Text(player.name)))
                       .toList(),
                   onChanged: (value) {
                     if (value == null) return;
@@ -407,10 +445,11 @@ class _GameScreenState extends State<GameScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: secondId,
+                  initialValue: secondId,
                   decoration: const InputDecoration(labelText: 'Player 2'),
                   items: secondOptions
-                      .map((player) => DropdownMenuItem(value: player.id, child: Text(player.name)))
+                      .map((player) => DropdownMenuItem(
+                          value: player.id, child: Text(player.name)))
                       .toList(),
                   onChanged: (value) {
                     if (value == null) return;
@@ -451,7 +490,8 @@ class _GameScreenState extends State<GameScreen> {
           theme,
           icon: Icons.info_outline,
           title: 'League stage',
-          message: 'Enter scores for every match. Top $qualifierCount teams advance to the $qualifierStage.',
+          message:
+              'Enter scores for every match. Top $qualifierCount teams advance to the $qualifierStage.',
         ),
         const SizedBox(height: 16),
         _buildStandings(theme, standings, qualifierCount),
@@ -462,13 +502,16 @@ class _GameScreenState extends State<GameScreen> {
           icon: Icons.sports_score,
           child: Column(
             children: _state!.leagueMatches
-                .map((match) => _buildMatchTile(theme, match, onScore: () => _showScoreDialog(match, isLeague: true)))
+                .map((match) => _buildMatchTile(theme, match,
+                    onScore: () => _showScoreDialog(match, isLeague: true)))
                 .toList(),
           ),
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
-          onPressed: _state!.isLeagueComplete ? () => _refresh(_service.startKnockout) : null,
+          onPressed: _state!.isLeagueComplete
+              ? () => _refresh(_service.startKnockout)
+              : null,
           icon: const Icon(Icons.account_tree),
           label: Text('Create ${stageLabel(_state!.firstKnockoutStage)}'),
         ),
@@ -476,7 +519,8 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildStandings(ThemeData theme, List<TeamStanding> standings, int qualifierCount) {
+  Widget _buildStandings(
+      ThemeData theme, List<TeamStanding> standings, int qualifierCount) {
     return _buildSectionCard(
       theme,
       title: 'Standings',
@@ -484,36 +528,47 @@ class _GameScreenState extends State<GameScreen> {
       child: Column(
         children: [
           for (var index = 0; index < standings.length; index += 1)
-            _buildStandingRow(theme, standings[index], index + 1, index < qualifierCount),
+            _buildStandingRow(
+                theme, standings[index], index + 1, index < qualifierCount),
         ],
       ),
     );
   }
 
-  Widget _buildStandingRow(ThemeData theme, TeamStanding standing, int rank, bool qualifies) {
+  Widget _buildStandingRow(
+      ThemeData theme, TeamStanding standing, int rank, bool qualifies) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: qualifies ? theme.colorScheme.secondaryContainer.withOpacity(0.65) : theme.colorScheme.surface,
+        color: qualifies
+            ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.65)
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: qualifies ? theme.colorScheme.secondary : theme.colorScheme.outline.withOpacity(0.25),
+          color: qualifies
+              ? theme.colorScheme.secondary
+              : theme.colorScheme.outline.withValues(alpha: 0.25),
         ),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: qualifies ? theme.colorScheme.secondary : theme.colorScheme.surfaceContainerHighest,
-            foregroundColor: qualifies ? theme.colorScheme.onSecondary : theme.colorScheme.onSurface,
+            backgroundColor: qualifies
+                ? theme.colorScheme.secondary
+                : theme.colorScheme.surfaceContainerHighest,
+            foregroundColor: qualifies
+                ? theme.colorScheme.onSecondary
+                : theme.colorScheme.onSurface,
             child: Text('$rank'),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               standing.team.name(_state!.players),
-              style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           _statColumn('P', standing.played),
@@ -531,7 +586,9 @@ class _GameScreenState extends State<GameScreen> {
       width: 42,
       child: Column(
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
           const SizedBox(height: 2),
           Text('$value', style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
@@ -552,7 +609,9 @@ class _GameScreenState extends State<GameScreen> {
         _buildInfoBanner(
           theme,
           icon: Icons.account_tree,
-          title: activeStage == null ? 'Advancing bracket' : stageLabel(activeStage),
+          title: activeStage == null
+              ? 'Advancing bracket'
+              : stageLabel(activeStage),
           message: activeStage == null
               ? 'Winners are being prepared for the next round.'
               : 'Enter scores for ${stageLabel(activeStage).toLowerCase()} matches to advance winners.',
@@ -565,20 +624,25 @@ class _GameScreenState extends State<GameScreen> {
           MatchStage.semifinal,
           MatchStage.finalMatch,
         ].where(matchesByStage.containsKey).map((stage) {
-          final matches = matchesByStage[stage]!..sort((a, b) => a.order.compareTo(b.order));
+          final matches = matchesByStage[stage]!
+            ..sort((a, b) => a.order.compareTo(b.order));
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _buildSectionCard(
               theme,
               title: stageLabel(stage),
-              icon: stage == MatchStage.finalMatch ? Icons.emoji_events : Icons.sports_tennis,
+              icon: stage == MatchStage.finalMatch
+                  ? Icons.emoji_events
+                  : Icons.sports_tennis,
               child: Column(
                 children: matches.map((match) {
                   final canScore = stage == activeStage || !match.isCompleted;
                   return _buildMatchTile(
                     theme,
                     match,
-                    onScore: canScore ? () => _showScoreDialog(match, isLeague: false) : null,
+                    onScore: canScore
+                        ? () => _showScoreDialog(match, isLeague: false)
+                        : null,
                   );
                 }).toList(),
               ),
@@ -590,8 +654,12 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildChampion(ThemeData theme) {
-    final champion = _state!.championTeamId == null ? null : _state!.teamName(_state!.championTeamId!);
-    final finalMatches = _state!.knockoutMatches.where((match) => match.stage == MatchStage.finalMatch).toList();
+    final champion = _state!.championTeamId == null
+        ? null
+        : _state!.teamName(_state!.championTeamId!);
+    final finalMatches = _state!.knockoutMatches
+        .where((match) => match.stage == MatchStage.finalMatch)
+        .toList();
     final finalMatch = finalMatches.isEmpty ? null : finalMatches.last;
 
     return Center(
@@ -600,11 +668,13 @@ class _GameScreenState extends State<GameScreen> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              Icon(Icons.emoji_events, size: 80, color: theme.colorScheme.primary),
+              Icon(Icons.emoji_events,
+                  size: 80, color: theme.colorScheme.primary),
               const SizedBox(height: 16),
               Text(
                 'Tournament Champion',
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
@@ -659,7 +729,8 @@ class _GameScreenState extends State<GameScreen> {
           children: [
             Text(
               '${stageLabel(match.stage)} Match ${match.order}',
-              style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
+              style: theme.textTheme.labelLarge
+                  ?.copyWith(color: theme.colorScheme.primary),
             ),
             const SizedBox(height: 10),
             _teamScoreLine(theme, teamA, match.scoreA, winner == match.teamAId),
@@ -686,31 +757,41 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _teamScoreLine(ThemeData theme, String teamName, int? score, bool winner) {
+  Widget _teamScoreLine(
+      ThemeData theme, String teamName, int? score, bool winner) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: winner ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        color: winner
+            ? theme.colorScheme.primaryContainer
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
           if (winner) ...[
-            Icon(Icons.check_circle, color: theme.colorScheme.primary, size: 18),
+            Icon(Icons.check_circle,
+                color: theme.colorScheme.primary, size: 18),
             const SizedBox(width: 8),
           ],
           Expanded(
-            child: Text(teamName, style: const TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(teamName,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
-          Text(score?.toString() ?? '-', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(score?.toString() ?? '-',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Future<void> _showScoreDialog(TournamentMatch match, {required bool isLeague}) async {
-    final teamAController = TextEditingController(text: match.scoreA?.toString() ?? '');
-    final teamBController = TextEditingController(text: match.scoreB?.toString() ?? '');
+  Future<void> _showScoreDialog(TournamentMatch match,
+      {required bool isLeague}) async {
+    final teamAController =
+        TextEditingController(text: match.scoreA?.toString() ?? '');
+    final teamBController =
+        TextEditingController(text: match.scoreB?.toString() ?? '');
     final formKey = GlobalKey<FormState>();
 
     await showDialog<void>(
@@ -726,7 +807,8 @@ class _GameScreenState extends State<GameScreen> {
               const SizedBox(height: 12),
               _scoreField(teamBController, _state!.teamName(match.teamBId)),
               const SizedBox(height: 10),
-              const Text('Scores cannot be tied because a winner must advance.'),
+              const Text(
+                  'Scores cannot be tied because a winner must advance.'),
             ],
           ),
         ),
@@ -794,7 +876,8 @@ class _GameScreenState extends State<GameScreen> {
                 Expanded(
                   child: Text(
                     title,
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
                 if (trailing != null) trailing,
@@ -834,7 +917,9 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(message, style: TextStyle(color: theme.colorScheme.onPrimaryContainer)),
+                  Text(message,
+                      style: TextStyle(
+                          color: theme.colorScheme.onPrimaryContainer)),
                 ],
               ),
             ),
@@ -848,9 +933,11 @@ class _GameScreenState extends State<GameScreen> {
     final reset = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.warning_amber, color: Theme.of(ctx).colorScheme.error, size: 42),
+        icon: Icon(Icons.warning_amber,
+            color: Theme.of(ctx).colorScheme.error, size: 42),
         title: const Text('Reset tournament?'),
-        content: const Text('This clears the current players, teams, scores, and bracket.'),
+        content: const Text(
+            'This clears the current players, teams, scores, and bracket.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),

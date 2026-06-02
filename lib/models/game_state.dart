@@ -279,7 +279,8 @@ class TournamentState {
     ];
 
     for (final stage in stages) {
-      final matches = knockoutMatches.where((match) => match.stage == stage).toList();
+      final matches =
+          knockoutMatches.where((match) => match.stage == stage).toList();
       if (matches.isNotEmpty && matches.any((match) => !match.isCompleted)) {
         return stage;
       }
@@ -302,12 +303,15 @@ class TournamentState {
       teams: teams ?? this.teams,
       leagueMatches: leagueMatches ?? this.leagueMatches,
       knockoutMatches: knockoutMatches ?? this.knockoutMatches,
-      championTeamId: clearChampion ? null : championTeamId ?? this.championTeamId,
+      championTeamId:
+          clearChampion ? null : championTeamId ?? this.championTeamId,
     );
   }
 
   List<String> get assignedPlayerIds {
-    return teams.expand((team) => [team.playerOneId, team.playerTwoId]).toList();
+    return teams
+        .expand((team) => [team.playerOneId, team.playerTwoId])
+        .toList();
   }
 
   List<Player> get unassignedPlayers {
@@ -373,7 +377,8 @@ class TournamentState {
         'players': players.map((player) => player.toJson()).toList(),
         'teams': teams.map((team) => team.toJson()).toList(),
         'leagueMatches': leagueMatches.map((match) => match.toJson()).toList(),
-        'knockoutMatches': knockoutMatches.map((match) => match.toJson()).toList(),
+        'knockoutMatches':
+            knockoutMatches.map((match) => match.toJson()).toList(),
         'championTeamId': championTeamId,
       };
 
@@ -383,16 +388,20 @@ class TournamentState {
       return TournamentState(
         phase: _phaseFromJson(json['phase'] as String?),
         players: (json['players'] as List? ?? [])
-            .map((value) => Player.fromJson(Map<String, dynamic>.from(value as Map)))
+            .map((value) =>
+                Player.fromJson(Map<String, dynamic>.from(value as Map)))
             .toList(),
         teams: (json['teams'] as List? ?? [])
-            .map((value) => Team.fromJson(Map<String, dynamic>.from(value as Map)))
+            .map((value) =>
+                Team.fromJson(Map<String, dynamic>.from(value as Map)))
             .toList(),
         leagueMatches: (json['leagueMatches'] as List? ?? [])
-            .map((value) => TournamentMatch.fromJson(Map<String, dynamic>.from(value as Map)))
+            .map((value) => TournamentMatch.fromJson(
+                Map<String, dynamic>.from(value as Map)))
             .toList(),
         knockoutMatches: (json['knockoutMatches'] as List? ?? [])
-            .map((value) => TournamentMatch.fromJson(Map<String, dynamic>.from(value as Map)))
+            .map((value) => TournamentMatch.fromJson(
+                Map<String, dynamic>.from(value as Map)))
             .toList(),
         championTeamId: json['championTeamId'] as String?,
       );

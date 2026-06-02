@@ -10,7 +10,6 @@ dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.2.2   # Save tournament state locally (simple key-value store)
-  flutter_tts: ^4.2.0
 
 dev_dependencies:
   flutter_test:

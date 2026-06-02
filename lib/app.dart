@@ -33,13 +33,15 @@ class _PickleballAppState extends State<PickleballApp> {
 
   void _setTheme(String themeId) {
     setState(() => _themeId = themeId);
-    SharedPreferences.getInstance().then((p) => p.setString('pickleball_theme', themeId));
+    SharedPreferences.getInstance()
+        .then((p) => p.setString('pickleball_theme', themeId));
   }
 
   void _toggleDarkMode() {
     setState(() {
       _darkMode = !_darkMode;
-      SharedPreferences.getInstance().then((p) => p.setBool('pickleball_dark_mode', _darkMode));
+      SharedPreferences.getInstance()
+          .then((p) => p.setBool('pickleball_dark_mode', _darkMode));
     });
   }
 
