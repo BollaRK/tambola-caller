@@ -1,5 +1,5 @@
-name: tambola_caller
-description: Tambola / Housie number caller app. Cross-platform (Android & iOS).
+name: pickleball_league
+description: Pickleball doubles league and knockout tournament app. Cross-platform (Android & iOS).
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,8 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  shared_preferences: ^2.2.2   # Save game state locally (simple key-value store)
-  flutter_tts: ^4.2.0          # Text-to-speech for announcing numbers
+  shared_preferences: ^2.2.2   # Save tournament state locally (simple key-value store)
+  flutter_tts: ^4.2.0
 
 dev_dependencies:
   flutter_test:
